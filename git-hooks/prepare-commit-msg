@@ -1,0 +1,67 @@
+#!/Python33/python
+ 
+import sys
+import re
+import os.path
+ 
+devInto = 0
+mergeMsgDir = '.git/MERGE_MSG'
+commitMsgDir = '.git/COMMIT_EDITMSG'
+editedCommitMsg = ''
+ 
+errorMessage = """
+***Warning***
+It looks like you are trying to merge {}                
+If you are planning on merging this branch into STABLE later you should definitely rethink doing this merge
+However, if you know what you are doing and want to complete the merge run \'git commit --no-verify\'
+***Warning***
+"""
+       
+def main():
+        if commitIsMessage() and mergeInProgress() and mergingFromDev():
+                if messageContainsForce():             
+                        cleanCommitMessage()
+                        sys.exit(0)
+                else:
+                        print(errorMessage.format(devInto))
+                        sys.exit(1)
+        elif commitIsMerge() and mergingFromDev():
+                print(errorMessage.format(devInto))    
+                sys.exit(1)
+        else:
+                sys.exit(0)
+       
+def commitIsMessage():
+        return sys.argv[2] == 'message'
+ 
+def mergeInProgress():
+        return os.path.isfile(mergeMsgDir)
+       
+def messageContainsForce():
+        with open(sys.argv[1]) as commitMsg:
+                pattern = re.compile('\*FORCE\*\s*')                                                   
+                msg = commitMsg.readline()
+                if (pattern.match(msg)):               
+                        global editedCommitMsg
+                        editedCommitMsg = pattern.sub('', msg)
+                        return True                                            
+ 
+def cleanCommitMessage():
+        file = open(commitMsgDir, 'w+')
+        file.write(editedCommitMsg)
+        file.close()
+                       
+def commitIsMerge():
+        return sys.argv[2] == 'merge'
+       
+def mergingFromDev():          
+        with open(mergeMsgDir) as mergeMsg:
+                pattern = re.compile('\'(origin/)?\d\d\d\d/HL\d/DEV\'\sinto\s[\w/\-_]+')
+                matchesDev = pattern.search(mergeMsg.read())           
+               
+                global devInto
+                devInto = matchesDev.group()           
+                return matchesDev
+ 
+if __name__ == '__main__':
+        main()
