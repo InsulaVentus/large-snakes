@@ -1,67 +1,84 @@
-#!/Python33/python
- 
+#!/apps/python-3.2.2/python
+
+"""
+Git prepare-commit-msg hook. This hook when placed in your repository\'s .git directory will trigger each time you commit. 
+The script will determine if you are attempting to merge a DEV branch eg. 2015/HL2/DEV into any other branch and prevent you from doing so. The hook can however
+be overriden by adding a commit message containg *FORCE* as an option to the merge commit.
+
+NOTE: Since git does not offer any \'prepare-merge hooks\' you will have to resolve any conflicts before this script triggers. The script will trigger after all conflicts are resolved
+when you attempt to commit the merge. During conflict free merges the script will trigger immediately.
+"""
+
+__author__ = "Oyvind Strommen"
+
 import sys
 import re
 import os.path
- 
+
 devInto = 0
 mergeMsgDir = '.git/MERGE_MSG'
 commitMsgDir = '.git/COMMIT_EDITMSG'
 editedCommitMsg = ''
- 
+
 errorMessage = """
 ***Warning***
-It looks like you are trying to merge {}                
+It looks like you are trying to merge {} 		
 If you are planning on merging this branch into STABLE later you should definitely rethink doing this merge
-However, if you know what you are doing and want to complete the merge run \'git commit --no-verify\'
-***Warning***
-"""
-       
+However, if you know what you are doing and want to complete the merge run \'git commit -m \"*FORCE* <your commit message>"\' 
+""" 
+	
 def main():
-        if commitIsMessage() and mergeInProgress() and mergingFromDev():
-                if messageContainsForce():             
-                        cleanCommitMessage()
-                        sys.exit(0)
-                else:
-                        print(errorMessage.format(devInto))
-                        sys.exit(1)
-        elif commitIsMerge() and mergingFromDev():
-                print(errorMessage.format(devInto))    
-                sys.exit(1)
-        else:
-                sys.exit(0)
-       
+	if commitIsMessage() and mergeInProgress() and mergingFromDev(): 		
+		if messageContainsForce(): #User has overriden hook		
+			cleanCommitMessage()
+			sys.exit(0)
+		else:
+			print(errorMessage.format(devInto))
+			sys.exit(1)
+	elif commitIsMerge() and mergingFromDev():
+		print(errorMessage.format(devInto))	
+		sys.exit(1)
+	else:
+		sys.exit(0)
+	
+##Determine if the current commit is a message commit. That is, if -m is passed as an option to the commit.
 def commitIsMessage():
-        return sys.argv[2] == 'message'
- 
+	return len(sys.argv) >= 3 and sys.argv[2] == 'message'
+
+##Determine if we are currently merging.
 def mergeInProgress():
-        return os.path.isfile(mergeMsgDir)
-       
+	return os.path.isfile(mergeMsgDir)
+	
+##Determine if the commit message contains the keyword *FORCE* and remove it from the message if it does.
 def messageContainsForce():
-        with open(sys.argv[1]) as commitMsg:
-                pattern = re.compile('\*FORCE\*\s*')                                                   
-                msg = commitMsg.readline()
-                if (pattern.match(msg)):               
-                        global editedCommitMsg
-                        editedCommitMsg = pattern.sub('', msg)
-                        return True                                            
- 
+	with open(sys.argv[1]) as commitMsg:
+		pattern = re.compile('\*FORCE\*\s*')							
+		msg = commitMsg.readline()
+		if (pattern.match(msg)):		
+			global editedCommitMsg 
+			editedCommitMsg = pattern.sub('', msg)
+			return True						
+
+##Re write the commit message.
 def cleanCommitMessage():
-        file = open(commitMsgDir, 'w+')
-        file.write(editedCommitMsg)
-        file.close()
-                       
+	file = open(commitMsgDir, 'w+')
+	file.write(editedCommitMsg)
+	file.close()
+		
+##Determine if the current commit is a merge commit.
 def commitIsMerge():
-        return sys.argv[2] == 'merge'
-       
-def mergingFromDev():          
-        with open(mergeMsgDir) as mergeMsg:
-                pattern = re.compile('\'(origin/)?\d\d\d\d/HL\d/DEV\'\sinto\s[\w/\-_]+')
-                matchesDev = pattern.search(mergeMsg.read())           
-               
-                global devInto
-                devInto = matchesDev.group()           
-                return matchesDev
- 
+	return len(sys.argv) >= 3 and sys.argv[2] == 'merge'
+	
+##Determine if we are merging from a DEV branch.
+def mergingFromDev():		
+	with open(mergeMsgDir) as mergeMsg:
+		pattern = re.compile('\'(origin/)?\d\d\d\d/HL\d/DEV\'\sinto\s[\w/\-_]+')
+		matchesDev = pattern.search(mergeMsg.readline())		
+		
+		if (matchesDev):			
+			global devInto
+			devInto = matchesDev.group()		
+			return matchesDev
+
 if __name__ == '__main__':
-        main()
+	main()
