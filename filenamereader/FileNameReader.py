@@ -9,7 +9,9 @@ class FileNameReader:
     SNAPSHOT = 'SNAPSHOT'
 
     def extract_version_number(self, directory, file_format):
-        """Extract the version number from a file of a given format in any given directory"""
+        """
+        Extract the version number from a file of a given format in any given directory
+        """
         list_of_files = listdir(directory)
 
         for file in list_of_files:
